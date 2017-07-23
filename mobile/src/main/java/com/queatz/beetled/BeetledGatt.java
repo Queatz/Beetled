@@ -5,12 +5,11 @@ import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothProfile;
-import android.os.Handler;
-import android.os.Looper;
 import android.util.Log;
 import android.widget.Toast;
 
-import java.nio.charset.Charset;
+import com.queatz.beetled.util.WriteQueue;
+
 import java.util.UUID;
 
 import static android.bluetooth.BluetoothGatt.GATT_SUCCESS;
@@ -20,6 +19,31 @@ import static android.bluetooth.BluetoothGatt.GATT_SUCCESS;
  */
 
 public abstract class BeetledGatt extends BluetoothGattCallback {
+
+    private class BeetledGattWrite {
+        final BluetoothGattCharacteristic characteristic;
+        final String value;
+
+        public BeetledGattWrite(BluetoothGattCharacteristic characteristic, String value) {
+            this.characteristic = characteristic;
+            this.value = value;
+        }
+    }
+
+    private WriteQueue<BeetledGattWrite> queue = new WriteQueue<BeetledGattWrite>() {
+        @Override
+        public void emit(BeetledGattWrite item) {
+            if (item.characteristic == null || gatt == null) {
+                return;
+            }
+
+            item.characteristic.setValue(item.value);//.getBytes(Charset.forName("ISO-8859-1"))
+
+            if (!gatt.writeCharacteristic(item.characteristic)) {
+                err("gatt write failed");
+            }
+        }
+    };
 
     private final App app;
     private BluetoothGatt gatt;
@@ -40,24 +64,14 @@ public abstract class BeetledGatt extends BluetoothGattCallback {
         removed();
 
         gatt.close();
+        gatt = null;
     }
 
     protected abstract void removed();
     protected abstract void read(String string);
 
-    public boolean write(String string) {
-        if (serialPortCharacteristic == null || gatt == null) {
-            return false;
-        }
-
-        serialPortCharacteristic.setValue(string.getBytes(Charset.forName("ISO-8859-1")));
-
-        if (!gatt.writeCharacteristic(serialPortCharacteristic)) {
-            err("gatt write failed");
-            return false;
-        }
-
-        return true;
+    public void write(String string) {
+        queue.add(new BeetledGattWrite(serialPortCharacteristic, string));
     }
 
     @Override
@@ -97,17 +111,10 @@ public abstract class BeetledGatt extends BluetoothGattCallback {
             return;
         }
 
-        commandCharacteristic.setValue(Environment.BLUNO_PASSWORD);
-        gatt.writeCharacteristic(commandCharacteristic);
-        commandCharacteristic.setValue(Environment.BLUNO_BAUDRATE_BUFFER);
-        gatt.writeCharacteristic(commandCharacteristic);
+        queue.add(new BeetledGattWrite(commandCharacteristic, Environment.BLUNO_PASSWORD));
+        queue.add(new BeetledGattWrite(commandCharacteristic, Environment.BLUNO_BAUDRATE_BUFFER));
         gatt.setCharacteristicNotification(serialPortCharacteristic, true);
-        new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                requestLockStatus();
-            }
-        }, 100);
+        requestLockStatus();
     }
 
     public void requestLockStatus() {
@@ -130,6 +137,8 @@ public abstract class BeetledGatt extends BluetoothGattCallback {
         if (Environment.BLE_SERIAL_PORT_UUID.equals(uuid)) {
             err("write: " + (status == GATT_SUCCESS));
         }
+
+        queue.next();
     }
 
     @Override

@@ -50,7 +50,7 @@ public class BeetledNotification {
 
         resultIntent = new Intent(app, AdvertiseService.class);
         resultIntent.putExtra(AdvertiseService.EXTRA_ACTION, Environment.UNLOCK_ACTION);
-        resultIntent.putExtra(AdvertiseService.EXTRA_DATA, (status ? "U" : "L"));
+        resultIntent.putExtra(AdvertiseService.EXTRA_DATA, (status ? Environment.LOCK_STATE_UNLOCK : Environment.LOCK_STATE_LOCK));
 
         builder.setContentIntent(PendingIntent.getService(app, 0, resultIntent, PendingIntent.FLAG_UPDATE_CURRENT));
 

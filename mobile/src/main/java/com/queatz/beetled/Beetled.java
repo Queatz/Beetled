@@ -53,9 +53,12 @@ public class Beetled {
     }
 
     public boolean enable() {
-
         if (!app.getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {
             return false;
+        }
+
+        if (scanCallback != null) {
+            bluetoothLeScanner.stopScan(scanCallback);
         }
 
         if (!setup) {
