@@ -154,6 +154,7 @@ public abstract class BeetledGatt extends BluetoothGattCallback {
     }
 
     private void err(final String string) {
+        if (true)return;
         app.run(new Runnable() {
             @Override
             public void run() {

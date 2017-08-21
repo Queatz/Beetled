@@ -44,7 +44,6 @@ public class BeetledNotification {
                 .setLargeIcon(BitmapFactory.decodeResource(app.getResources(), status ? R.drawable.icon_locked : R.drawable.icon))
                 .setContentTitle("Front Door " + (status ? "Locked" : "Unlocked"))
                 .setContentText("Tap to " + (status ? "unlock" : "lock"))
-                .setOngoing(true)
                 .setColor(app.getResources().getColor(android.R.color.background_dark))
                 .setCategory(Notification.CATEGORY_SOCIAL);
 

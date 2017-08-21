@@ -57,9 +57,7 @@ public class Beetled {
             return false;
         }
 
-        if (scanCallback != null) {
-            bluetoothLeScanner.stopScan(scanCallback);
-        }
+        disable();
 
         if (!setup) {
             bluetoothManager = (BluetoothManager) app.getSystemService(Context.BLUETOOTH_SERVICE);
@@ -194,7 +192,6 @@ public class Beetled {
 
             if (bluetoothLeScanner != null) {
                 bluetoothLeScanner.stopScan(scanCallback);
-                bluetoothLeScanner = null;
             }
         }
 
