@@ -1,10 +1,12 @@
-package com.queatz.beetled.util;
+package com.queatz.bettleconnect.util;
 
 import android.os.Handler;
 import android.os.Looper;
 
 /**
  * Created by jacob on 7/23/17.
+ *
+ *
  */
 
 public class Debouncer {
@@ -30,6 +32,7 @@ public class Debouncer {
             handler.removeCallbacks(runnable);
         }
 
+        this.triggered = true;
         handler.postDelayed(runnable, delay);
     }
 }

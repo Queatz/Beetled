@@ -1,4 +1,4 @@
-package com.queatz.beetled;
+package com.queatz.bettleconnect;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -7,16 +7,19 @@ import android.os.Bundle;
 
 /**
  * Created by jacob on 7/23/17.
+ *
+ * This receiver listens to Android events that may help the beetle stay connected.
+ *
+ * See the AndroidManifest declaration.
  */
-
-public class AdvertiseBroadcastReceiver extends BroadcastReceiver {
+public class BeetleBroadcastReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
-        Intent serviceIntent = new Intent(context, AdvertiseService.class);
+        Intent serviceIntent = new Intent(context, BeetleService.class);
 
         if (intent != null) {
             Bundle extras = new Bundle();
-            extras.putString(AdvertiseService.EXTRA_ACTION, intent.getAction());
+            extras.putString(BeetleService.EXTRA_ACTION, intent.getAction());
             serviceIntent.putExtras(extras);
         }
 

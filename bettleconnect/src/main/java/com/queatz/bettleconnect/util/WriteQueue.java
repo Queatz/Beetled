@@ -1,11 +1,12 @@
-package com.queatz.beetled.util;
+package com.queatz.bettleconnect.util;
 
 import java.util.LinkedList;
 
 /**
  * Created by jacob on 7/23/17.
+ *
+ * A queue that waits for each asynchronous item to report completion before moving to the next item.
  */
-
 public abstract class WriteQueue<T> {
     private LinkedList<T> queue = new LinkedList<>();
     private boolean running;

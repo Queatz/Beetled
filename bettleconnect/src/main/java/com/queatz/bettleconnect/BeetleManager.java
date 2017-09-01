@@ -1,5 +1,6 @@
-package com.queatz.beetled;
+package com.queatz.bettleconnect;
 
+import android.app.Application;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
@@ -12,9 +13,6 @@ import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Handler;
 import android.os.ParcelUuid;
-import android.widget.Toast;
-
-import com.queatz.beetled.util.Debouncer;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -22,13 +20,14 @@ import java.util.UUID;
 
 /**
  * Created by jacob on 7/23/17.
+ *
+ * Manages the connection to the beetle from the library user's perspective.
  */
-
-public class Beetled {
+public class BeetleManager {
 
     private static final long REPORTING_DELAY = 500;
 
-    private final App app;
+    private final Application app;
 
     private BluetoothManager bluetoothManager;
     private BluetoothAdapter bluetoothAdapter;
@@ -39,19 +38,15 @@ public class Beetled {
 
     private boolean setup = false;
     private Handler handler;
-    private BeetledGatt beetledGatt;
-    private Debouncer debouncer;
+    private BeetleGatt beetleGatt;
 
-    public Beetled(App app) {
+    public BeetleManager(Application app) {
         this.app = app;
-        this.debouncer = new Debouncer(new Runnable() {
-            @Override
-            public void run() {
-                beetledGatt.requestLockStatus();
-            }
-        }, 4000);
     }
 
+    /**
+     * Enable scan and connect.
+     */
     public boolean enable() {
         if (!app.getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {
             return false;
@@ -73,14 +68,11 @@ public class Beetled {
             scanCallback = new ScanCallback() {
                 @Override
                 public void onScanResult(int callbackType, ScanResult result) {
-                    err("advertise - scan success");
                     foundDevice(result.getDevice());
                 }
 
                 @Override
                 public void onScanFailed(int errorCode) {
-                    err("advertise - scan failed " + errorCode);
-
                     if (errorCode == SCAN_FAILED_FEATURE_UNSUPPORTED) {
                         oldScan();
                     }
@@ -95,7 +87,7 @@ public class Beetled {
         }
 
         ScanFilter scanFilter = new ScanFilter.Builder()
-                .setServiceUuid(new ParcelUuid(Environment.BLE_SERVICE_UUID))
+                .setServiceUuid(new ParcelUuid(Config.BLE_SERVICE_UUID))
                 .build();
 
         ScanSettings scanSettings = new ScanSettings.Builder()
@@ -109,13 +101,56 @@ public class Beetled {
         if (bluetoothLeScanner != null) {
             bluetoothLeScanner.startScan(scanFilters, scanSettings, scanCallback);
         } else {
-            err("advertise - scanner null");
             return false;
         }
 
         return true;
     }
 
+    /**
+     * Disable scan and disconnect.
+     */
+    public void disable() {
+        if (scanCallback != null && bluetoothLeScanner != null) {
+            bluetoothLeScanner = bluetoothAdapter.getBluetoothLeScanner();
+
+            if (bluetoothLeScanner != null) {
+                bluetoothLeScanner.stopScan(scanCallback);
+            }
+        }
+
+        if (beetleGatt != null) {
+            beetleGatt.getGatt().close();
+            beetleGatt = null;
+        }
+
+        if (leScanCallbackOld != null) {
+            if (bluetoothAdapter != null) {
+                bluetoothAdapter.stopLeScan(leScanCallbackOld);
+            }
+        }
+    }
+
+    /**
+     * Send data to the beetle.
+     * @return if it was successful.
+     */
+    public boolean send(String data) {
+        if (data == null) {
+            return false;
+        }
+
+        if (beetleGatt == null) {
+            return false;
+        }
+
+        beetleGatt.write(data);
+        return true;
+    }
+
+    /**
+     * Implementation of old Android Scan API for pre Bluetooth 4.1 devices.
+     */
     private void oldScan() {
         if (leScanCallbackOld != null) {
             bluetoothAdapter.stopLeScan(leScanCallbackOld);
@@ -128,27 +163,13 @@ public class Beetled {
             }
         };
 
-        boolean success = bluetoothAdapter.startLeScan(
-                new UUID[] { Environment.BLE_SERVICE_UUID },
+        bluetoothAdapter.startLeScan(
+                new UUID[] { Config.BLE_SERVICE_UUID },
                 leScanCallbackOld
         );
-
-        if (success) {
-            err("advertise - scanner started using old method");
-        } else {
-            err("advertise - scanner failed completely");
-        }
     }
-
-    private void err(String string) {
-        if (true)return;
-        Toast.makeText(app, string, Toast.LENGTH_SHORT).show();
-    }
-
 
     private void foundDevice(final BluetoothDevice device) {
-        err("advertise - device found " + device);
-
         handler.post(new Runnable() {
             @Override
             public void run() {
@@ -158,67 +179,17 @@ public class Beetled {
     }
 
     private void doFoundDevice(final BluetoothDevice device) {
-        if (beetledGatt != null) {
+        if (beetleGatt != null) {
             return;
         }
 
-        beetledGatt = new BeetledGatt(app) {
-            @Override
-            protected void removed() {
-                beetledGatt = null;
-                new BeetledNotification(app, false).hide();
-            }
+        beetleGatt = new BeetleGatt();
 
-            @Override
-            protected void read(String string) {
-                if (Environment.LOCK_STATE_LOCK.equals(string)) {
-                    new BeetledNotification(app, true).showNotification();
-                } else if (Environment.LOCK_STATE_UNLOCK.equals(string)) {
-                    new BeetledNotification(app, false).showNotification();
-                }
-            }
-        };
+        // Prefer TRANSPORT_LE if possible
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-            device.connectGatt(app, true, beetledGatt, BluetoothDevice.TRANSPORT_LE);
+            device.connectGatt(app, true, beetleGatt, BluetoothDevice.TRANSPORT_LE);
         } else {
-            device.connectGatt(app, true, beetledGatt);
+            device.connectGatt(app, true, beetleGatt);
         }
-    }
-
-
-    public void disable() {
-        if (scanCallback != null && bluetoothLeScanner != null) {
-            bluetoothLeScanner = bluetoothAdapter.getBluetoothLeScanner();
-
-            if (bluetoothLeScanner != null) {
-                bluetoothLeScanner.stopScan(scanCallback);
-            }
-        }
-
-        if (beetledGatt != null) {
-            beetledGatt.getGatt().close();
-            beetledGatt = null;
-        }
-
-        if (leScanCallbackOld != null) {
-            if (bluetoothAdapter != null) {
-                bluetoothAdapter.stopLeScan(leScanCallbackOld);
-            }
-        }
-    }
-
-    public void send(String data) {
-        if (data == null) {
-            return;
-        }
-
-        if (beetledGatt == null) {
-            err("Not connected");
-            return;
-        }
-
-        beetledGatt.write(data);
-
-        debouncer.run();
     }
 }
