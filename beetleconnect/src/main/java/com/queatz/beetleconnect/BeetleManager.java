@@ -107,20 +107,7 @@ public class BeetleManager {
             setup = true;
         }
 
-        ScanSettings scanSettings = new ScanSettings.Builder()
-                .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
-                .setReportDelay(REPORTING_DELAY)
-                .build();
-
-        if (bluetoothLeScanner != null) {
-            bluetoothLeScanner.startScan(null, scanSettings, scanCallback);
-        } else {
-            return false;
-        }
-
-        background.postDelayed(flush, 1000);
-
-        return true;
+        return startScan();
     }
 
     /**
@@ -129,18 +116,41 @@ public class BeetleManager {
     public void disable() {
         locked = false;
 
+        stopScan();
+
+        synchronized (gatts) {
+            while (!gatts.isEmpty()) {
+                gatts.removeFirst().close();
+            }
+        }
+
+    }
+
+    private boolean startScan() {
+        ScanSettings scanSettings = new ScanSettings.Builder()
+                .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+                .setReportDelay(REPORTING_DELAY)
+                .build();
+
+        if (bluetoothLeScanner == null) {
+            Toast.makeText(app, "BLE scanner not available", Toast.LENGTH_SHORT).show();
+            return false;
+        }
+
+        bluetoothLeScanner.startScan(null, scanSettings, scanCallback);
+
+        background.postDelayed(flush, 1000);
+
+        return true;
+    }
+
+    private void stopScan() {
         if (background != null) {
             background.removeCallbacks(flush);
         }
 
         if (scanCallback != null && bluetoothLeScanner != null) {
             bluetoothLeScanner.stopScan(scanCallback);
-        }
-
-        synchronized (gatts) {
-            while (!gatts.isEmpty()) {
-                gatts.removeFirst().close();
-            }
         }
 
         oldScanDisable();
@@ -210,10 +220,18 @@ public class BeetleManager {
 
     synchronized void unlock(BeetleGatt gatt) {
         locked = false;
+
+        if (Beetle.isFindFirst()) {
+            startScan();
+        }
     }
 
     synchronized void lock(BeetleGatt gatt) {
         locked = true;
+
+        if (Beetle.isFindFirst()) {
+            stopScan();
+        }
     }
 
     boolean isLocked() {

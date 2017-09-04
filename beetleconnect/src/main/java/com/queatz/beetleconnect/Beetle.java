@@ -13,7 +13,11 @@ public class Beetle {
     private static BeetleListener beetleListener = null;
     private static BeetleManager beetleManager;
     private static boolean stayConnected = false;
+    private static boolean findFirst = false;
 
+    /**
+     * Must be called before using this class.
+     */
     public static void initialize(Context context) {
         if (beetleManager == null) {
             beetleManager = new BeetleManager((Application) context.getApplicationContext());
@@ -28,7 +32,7 @@ public class Beetle {
         return beetleManager;
     }
 
-    public static BeetleListener getBeetleListener() {
+    static BeetleListener getBeetleListener() {
         if (beetleListener == null) {
             return BeetleListener.NOOP;
         }
@@ -36,6 +40,9 @@ public class Beetle {
         return beetleListener;
     }
 
+    /**
+     * @param beetleListener Callback
+     */
     public static void subscribe(BeetleListener beetleListener) {
         Beetle.beetleListener = beetleListener;
     }
@@ -44,7 +51,23 @@ public class Beetle {
         return stayConnected;
     }
 
+    /**
+     * True - Automatically discover and connect at all times
+     * False - Only connect when enable() is called
+     */
     public static void stayConnected(boolean stayConnected) {
         Beetle.stayConnected = stayConnected;
+    }
+
+    public static boolean isFindFirst() {
+        return findFirst;
+    }
+
+    /**
+     * True - Only find the first Beetle
+     * False - Find as many Beetles as possible
+     */
+    public static void setFindFirst(boolean findFirst) {
+        Beetle.findFirst = findFirst;
     }
 }
