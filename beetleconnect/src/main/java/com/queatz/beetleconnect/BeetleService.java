@@ -1,4 +1,4 @@
-package com.queatz.bettleconnect;
+package com.queatz.beetleconnect;
 
 import android.app.Service;
 import android.bluetooth.BluetoothAdapter;
@@ -14,25 +14,12 @@ public class BeetleService extends Service {
 
     public static final String EXTRA_ACTION = "action";
 
-    private BeetleManager beetleManager;
-
-    protected static BeetleService service;
-
-    protected BeetleManager getBeetleManager() {
-        return beetleManager;
-    }
-
-    @Override
-    public void onCreate() {
-        super.onCreate();
-        service = this;
-        beetleManager = new BeetleManager(getApplication());
-    }
-
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        Beetle.initialize(getApplicationContext());
+
         if (intent == null) {
-            beetleManager.enable();
+            Beetle.getBeetleManager().enable();
         } else {
             if (intent.hasExtra(EXTRA_ACTION)) {
                 String action = intent.getStringExtra(EXTRA_ACTION);
@@ -42,27 +29,27 @@ public class BeetleService extends Service {
                     case Intent.ACTION_SCREEN_ON:
                     case Intent.ACTION_BOOT_COMPLETED:
                     case Intent.ACTION_BATTERY_OKAY:
-                        beetleManager.enable();
+                        Beetle.getBeetleManager().enable();
                         break;
                     case BluetoothAdapter.ACTION_STATE_CHANGED:
                         switch (intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, -1)) {
                             case BluetoothAdapter.STATE_ON:
                             case BluetoothAdapter.STATE_CONNECTED:
-                                beetleManager.enable();
+                                Beetle.getBeetleManager().enable();
                                 break;
                             case BluetoothAdapter.STATE_DISCONNECTED:
                             case BluetoothAdapter.STATE_DISCONNECTING:
                             case BluetoothAdapter.STATE_TURNING_OFF:
                             case BluetoothAdapter.STATE_OFF:
-                                beetleManager.disable();
+                                Beetle.getBeetleManager().disable();
                         }
                         break;
                     case Intent.ACTION_BATTERY_LOW:
-                        beetleManager.disable();
+                        Beetle.getBeetleManager().disable();
                         break;
                 }
             } else {
-                beetleManager.enable();
+                Beetle.getBeetleManager().enable();
             }
         }
 

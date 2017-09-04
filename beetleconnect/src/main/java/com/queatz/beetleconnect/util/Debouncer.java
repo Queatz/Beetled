@@ -1,4 +1,4 @@
-package com.queatz.bettleconnect.util;
+package com.queatz.beetleconnect.util;
 
 import android.os.Handler;
 import android.os.Looper;

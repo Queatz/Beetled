@@ -1,4 +1,4 @@
-package com.queatz.bettleconnect;
+package com.queatz.beetleconnect;
 
 import android.app.Application;
 import android.bluetooth.BluetoothAdapter;
@@ -6,15 +6,14 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.le.BluetoothLeScanner;
 import android.bluetooth.le.ScanCallback;
-import android.bluetooth.le.ScanFilter;
 import android.bluetooth.le.ScanResult;
 import android.bluetooth.le.ScanSettings;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Handler;
-import android.os.ParcelUuid;
+import android.widget.Toast;
 
-import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
 
@@ -29,19 +28,35 @@ public class BeetleManager {
 
     private final Application app;
 
-    private BluetoothManager bluetoothManager;
     private BluetoothAdapter bluetoothAdapter;
     private ScanCallback scanCallback;
     private BluetoothLeScanner bluetoothLeScanner;
 
+    // For old BLE api
     private BluetoothAdapter.LeScanCallback leScanCallbackOld;
 
+    private final LinkedList<BeetleGatt> gatts = new LinkedList<>();
+
+    private boolean locked = false;
     private boolean setup = false;
     private Handler handler;
-    private BeetleGatt beetleGatt;
+    private Handler background;
+
+    private Runnable flush = new Runnable() {
+        @Override
+        public void run() {
+            if (leScanCallbackOld == null && scanCallback != null && bluetoothLeScanner != null) {
+                bluetoothLeScanner.flushPendingScanResults(scanCallback);
+            }
+
+            background.postDelayed(flush, 2000);
+        }
+    };
 
     public BeetleManager(Application app) {
         this.app = app;
+        handler = new Handler(app.getMainLooper());
+        background = new Handler();
     }
 
     /**
@@ -49,20 +64,22 @@ public class BeetleManager {
      */
     public boolean enable() {
         if (!app.getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {
+            Toast.makeText(app, "BLE not supported on this device", Toast.LENGTH_SHORT).show();
             return false;
         }
 
         disable();
 
         if (!setup) {
-            bluetoothManager = (BluetoothManager) app.getSystemService(Context.BLUETOOTH_SERVICE);
+            BluetoothManager bluetoothManager = (BluetoothManager) app.getSystemService(Context.BLUETOOTH_SERVICE);
 
             if (bluetoothManager != null) {
                 bluetoothAdapter = bluetoothManager.getAdapter();
             }
 
             if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled()) {
-               return false;
+                Toast.makeText(app, "BLE not enabled", Toast.LENGTH_SHORT).show();
+                return false;
             }
 
             scanCallback = new ScanCallback() {
@@ -77,32 +94,31 @@ public class BeetleManager {
                         oldScan();
                     }
                 }
+
+                @Override
+                public void onBatchScanResults(List<ScanResult> results) {
+                    for (ScanResult result : results) {
+                        foundDevice(result.getDevice());
+                    }
+                }
             };
 
             bluetoothLeScanner = bluetoothAdapter.getBluetoothLeScanner();
-
-            handler = new Handler(app.getMainLooper());
-
             setup = true;
         }
-
-        ScanFilter scanFilter = new ScanFilter.Builder()
-                .setServiceUuid(new ParcelUuid(Config.BLE_SERVICE_UUID))
-                .build();
 
         ScanSettings scanSettings = new ScanSettings.Builder()
                 .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
                 .setReportDelay(REPORTING_DELAY)
                 .build();
 
-        List<ScanFilter> scanFilters = new ArrayList<>();
-        scanFilters.add(scanFilter);
-
         if (bluetoothLeScanner != null) {
-            bluetoothLeScanner.startScan(scanFilters, scanSettings, scanCallback);
+            bluetoothLeScanner.startScan(null, scanSettings, scanCallback);
         } else {
             return false;
         }
+
+        background.postDelayed(flush, 1000);
 
         return true;
     }
@@ -111,24 +127,23 @@ public class BeetleManager {
      * Disable scan and disconnect.
      */
     public void disable() {
+        locked = false;
+
+        if (background != null) {
+            background.removeCallbacks(flush);
+        }
+
         if (scanCallback != null && bluetoothLeScanner != null) {
-            bluetoothLeScanner = bluetoothAdapter.getBluetoothLeScanner();
+            bluetoothLeScanner.stopScan(scanCallback);
+        }
 
-            if (bluetoothLeScanner != null) {
-                bluetoothLeScanner.stopScan(scanCallback);
+        synchronized (gatts) {
+            while (!gatts.isEmpty()) {
+                gatts.removeFirst().close();
             }
         }
 
-        if (beetleGatt != null) {
-            beetleGatt.getGatt().close();
-            beetleGatt = null;
-        }
-
-        if (leScanCallbackOld != null) {
-            if (bluetoothAdapter != null) {
-                bluetoothAdapter.stopLeScan(leScanCallbackOld);
-            }
-        }
+        oldScanDisable();
     }
 
     /**
@@ -140,12 +155,69 @@ public class BeetleManager {
             return false;
         }
 
-        if (beetleGatt == null) {
+        if (gatts.isEmpty()) {
             return false;
         }
 
-        beetleGatt.write(data);
+        synchronized (gatts) {
+            for (BeetleGatt gatt : gatts) {
+                gatt.write(data);
+            }
+        }
+
         return true;
+    }
+
+    /**
+     * Called when a potential beetle is found
+     */
+    private void foundDevice(final BluetoothDevice device) {
+        if (isLocked()) {
+            return;
+        }
+
+        handler.post(new Runnable() {
+            @Override
+            public void run() {
+                if (isLocked()) {
+                    return;
+                }
+
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                    device.connectGatt(app, true, newGatt(), BluetoothDevice.TRANSPORT_LE);
+                } else {
+                    device.connectGatt(app, true, newGatt());
+                }
+            }
+        });
+    }
+
+    /**
+     * Creates a new tracked gatt
+     */
+    private BeetleGatt newGatt() {
+        synchronized (gatts) {
+            BeetleGatt gatt = new BeetleGatt();
+
+            gatts.add(gatt);
+            return gatt;
+        }
+    }
+
+    /*
+     * Single connection locking
+     */
+
+    synchronized void unlock(BeetleGatt gatt) {
+        locked = false;
+    }
+
+    synchronized void lock(BeetleGatt gatt) {
+        locked = true;
+    }
+
+    boolean isLocked() {
+        return locked;
     }
 
     /**
@@ -169,27 +241,11 @@ public class BeetleManager {
         );
     }
 
-    private void foundDevice(final BluetoothDevice device) {
-        handler.post(new Runnable() {
-            @Override
-            public void run() {
-                doFoundDevice(device);
+    private void oldScanDisable() {
+        if (leScanCallbackOld != null) {
+            if (bluetoothAdapter != null) {
+                bluetoothAdapter.stopLeScan(leScanCallbackOld);
             }
-        });
-    }
-
-    private void doFoundDevice(final BluetoothDevice device) {
-        if (beetleGatt != null) {
-            return;
-        }
-
-        beetleGatt = new BeetleGatt();
-
-        // Prefer TRANSPORT_LE if possible
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-            device.connectGatt(app, true, beetleGatt, BluetoothDevice.TRANSPORT_LE);
-        } else {
-            device.connectGatt(app, true, beetleGatt);
         }
     }
 }

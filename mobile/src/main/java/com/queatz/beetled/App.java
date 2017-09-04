@@ -4,9 +4,9 @@ import android.app.Application;
 import android.os.Handler;
 import android.os.Looper;
 
-import com.queatz.bettleconnect.Beetle;
-import com.queatz.bettleconnect.BeetleListener;
-import com.queatz.bettleconnect.util.Debouncer;
+import com.queatz.beetleconnect.Beetle;
+import com.queatz.beetleconnect.BeetleListener;
+import com.queatz.beetleconnect.util.Debouncer;
 
 /**
  * Created by jacob on 7/23/17.

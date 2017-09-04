@@ -1,8 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.queatz.bettleconnect">
+    package="com.queatz.beetleconnect">
 
     <uses-permission android:name="android.permission.BLUETOOTH"/>
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_PRIVILEGED"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
 
@@ -10,10 +13,10 @@
         android:supportsRtl="true">
 
         <service
-            android:name="com.queatz.bettleconnect.BeetleService"
+            android:name="com.queatz.beetleconnect.BeetleService"
             android:exported="false" />
 
-        <receiver android:name="com.queatz.bettleconnect.BeetleBroadcastReceiver" android:exported="false">
+        <receiver android:name="com.queatz.beetleconnect.BeetleBroadcastReceiver" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.USER_PRESENT" />

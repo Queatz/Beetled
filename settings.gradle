@@ -1,1 +1,1 @@
-include ':mobile', ':wear', ':bettleconnect'
+include ':mobile', ':wear', ':beetleconnect'

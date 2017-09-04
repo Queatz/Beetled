@@ -1,4 +1,6 @@
-package com.queatz.bettleconnect.util;
+package com.queatz.beetleconnect.util;
+
+import android.util.Log;
 
 import java.util.LinkedList;
 
@@ -11,7 +13,8 @@ public abstract class WriteQueue<T> {
     private LinkedList<T> queue = new LinkedList<>();
     private boolean running;
 
-    public void add(T item) {
+    public synchronized void add(T item) {
+        Log.w("BEETLE", "queue - add - " + queue.size() + " - " + running);
         if (!queue.isEmpty() || running) {
             queue.add(item);
             return;
@@ -21,7 +24,8 @@ public abstract class WriteQueue<T> {
         running = true;
     }
 
-    public void next() {
+    public synchronized void next() {
+        Log.w("BEETLE", "queue - next - " + queue.size() + " - " + running);
         if (queue.isEmpty()) {
             running = false;
             return;

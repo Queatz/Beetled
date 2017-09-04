@@ -1,4 +1,4 @@
-package com.queatz.bettleconnect;
+package com.queatz.beetleconnect;
 
 /**
  * Created by jacob on 9/1/17.

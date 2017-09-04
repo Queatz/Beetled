@@ -1,4 +1,4 @@
-package com.queatz.bettleconnect;
+package com.queatz.beetleconnect;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -15,6 +15,10 @@ import android.os.Bundle;
 public class BeetleBroadcastReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
+        if (!Beetle.stayConnected()) {
+            return;
+        }
+
         Intent serviceIntent = new Intent(context, BeetleService.class);
 
         if (intent != null) {
@@ -26,4 +30,3 @@ public class BeetleBroadcastReceiver extends BroadcastReceiver {
         context.startService(serviceIntent);
     }
 }
-

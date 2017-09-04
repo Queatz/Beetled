@@ -5,7 +5,7 @@ import android.content.Intent;
 import android.os.IBinder;
 import android.support.annotation.Nullable;
 
-import com.queatz.bettleconnect.Beetle;
+import com.queatz.beetleconnect.Beetle;
 
 /**
  * Created by jacob on 9/1/17.

@@ -1,4 +1,4 @@
-package com.queatz.bettleconnect;
+package com.queatz.beetleconnect;
 
 import java.util.UUID;
 

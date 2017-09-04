@@ -1,4 +1,4 @@
-package com.queatz.bettleconnect;
+package com.queatz.beetleconnect;
 
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
@@ -6,8 +6,9 @@ import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothProfile;
 
-import com.queatz.bettleconnect.util.WriteQueue;
+import com.queatz.beetleconnect.util.WriteQueue;
 
+import java.nio.charset.Charset;
 import java.util.UUID;
 
 /**
@@ -31,36 +32,47 @@ public class BeetleGatt extends BluetoothGattCallback {
         @Override
         public void emit(BeetledGattWrite item) {
             if (item.characteristic == null || gatt == null) {
+                queue.next();
                 return;
             }
 
-            item.characteristic.setValue(item.value);
+            item.characteristic.setValue(item.value.getBytes(Charset.forName("ISO-8859-1")));
+            gatt.writeCharacteristic(item.characteristic);
         }
     };
 
     private BluetoothGatt gatt;
-    private BluetoothGattService service;
-
     private BluetoothGattCharacteristic serialPortCharacteristic;
-    private BluetoothGattCharacteristic commandCharacteristic;
+    private boolean isValidBeetle = false;
 
-    private void close() {
+    public void close() {
         if (gatt == null) {
             return;
         }
 
-        Beetle.getBeetleListener().onDisconnected();
+        if (isValidBeetle) {
+            Beetle.getBeetleListener().onDisconnected();
+            Beetle.getBeetleManager().unlock(this);
+        }
 
         gatt.close();
         gatt = null;
     }
 
     public void write(String string) {
+        if (gatt == null) {
+            return;
+        }
+
         queue.add(new BeetledGattWrite(serialPortCharacteristic, string));
     }
 
     @Override
     public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
+        if (isValidBeetle) {
+            return;
+        }
+
         this.gatt = gatt;
 
         switch (newState) {
@@ -76,14 +88,21 @@ public class BeetleGatt extends BluetoothGattCallback {
     @Override
     public void onServicesDiscovered(BluetoothGatt gatt, int status) {
         this.gatt = gatt;
-        service = gatt.getService(Config.BLE_SERVICE_UUID);
+        BluetoothGattService service = gatt.getService(Config.BLE_SERVICE_UUID);
 
         if (service == null) {
             close();
             return;
         }
 
-        commandCharacteristic = service.getCharacteristic(Config.BLE_COMMAND_UUID);
+        if (isValidBeetle || Beetle.getBeetleManager().isLocked()) {
+            return;
+        }
+
+        isValidBeetle = true;
+        Beetle.getBeetleManager().lock(this);
+
+        BluetoothGattCharacteristic commandCharacteristic = service.getCharacteristic(Config.BLE_COMMAND_UUID);
         serialPortCharacteristic = service.getCharacteristic(Config.BLE_SERIAL_PORT_UUID);
 
         if (commandCharacteristic == null || serialPortCharacteristic == null) {
@@ -94,6 +113,7 @@ public class BeetleGatt extends BluetoothGattCallback {
         queue.add(new BeetledGattWrite(commandCharacteristic, Config.BLUNO_PASSWORD));
         queue.add(new BeetledGattWrite(commandCharacteristic, Config.BLUNO_BAUDRATE_BUFFER));
         gatt.setCharacteristicNotification(serialPortCharacteristic, true);
+
         Beetle.getBeetleListener().onConnected();
     }
 
@@ -112,13 +132,13 @@ public class BeetleGatt extends BluetoothGattCallback {
 
     @Override
     public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
+        if (!isValidBeetle) {
+            return;
+        }
+
         UUID uuid = characteristic.getUuid();
         if (Config.BLE_SERIAL_PORT_UUID.equals(uuid)) {
             Beetle.getBeetleListener().onRead(characteristic.getStringValue(0));
         }
-    }
-
-    public BluetoothGatt getGatt() {
-        return gatt;
     }
 }
