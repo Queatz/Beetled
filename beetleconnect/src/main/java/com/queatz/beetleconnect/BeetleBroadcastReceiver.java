@@ -15,6 +15,8 @@ import android.os.Bundle;
 public class BeetleBroadcastReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
+        Beetle.initialize(context);
+
         if (!Beetle.stayConnected()) {
             return;
         }

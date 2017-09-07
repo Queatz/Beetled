@@ -5,6 +5,7 @@ import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothProfile;
+import android.util.Log;
 
 import com.queatz.beetleconnect.util.WriteQueue;
 
@@ -36,6 +37,7 @@ public class BeetleGatt extends BluetoothGattCallback {
                 return;
             }
 
+            Log.w("BEETLE", "write: " + item.value);
             item.characteristic.setValue(item.value.getBytes(Charset.forName("ISO-8859-1")));
             gatt.writeCharacteristic(item.characteristic);
         }
@@ -119,6 +121,7 @@ public class BeetleGatt extends BluetoothGattCallback {
 
     @Override
     public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
+        Log.w("BEETLE", "read: " + new String(characteristic.getValue()));
         UUID uuid = characteristic.getUuid();
         if (Config.BLE_SERIAL_PORT_UUID.equals(uuid)) {
             Beetle.getBeetleListener().onRead(characteristic.getStringValue(0));
@@ -127,11 +130,13 @@ public class BeetleGatt extends BluetoothGattCallback {
 
     @Override
     public void onCharacteristicWrite(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
+        Log.w("BEETLE", "<<<<: " + new String(characteristic.getValue()));
         queue.next();
     }
 
     @Override
     public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
+        Log.w("BEETLE", "got: " + new String(characteristic.getValue()));
         if (!isValidBeetle) {
             return;
         }

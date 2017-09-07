@@ -11,28 +11,44 @@ import java.util.LinkedList;
  */
 public abstract class WriteQueue<T> {
     private LinkedList<T> queue = new LinkedList<>();
-    private boolean running;
+    private T current = null;
 
     public synchronized void add(T item) {
-        Log.w("BEETLE", "queue - add - " + queue.size() + " - " + running);
-        if (!queue.isEmpty() || running) {
+        Log.w("BEETLE", "queue - add - " + queue.size() + " - " + running());
+        if (running()) {
             queue.add(item);
             return;
         }
 
         emit(item);
-        running = true;
+        current = item;
     }
 
     public synchronized void next() {
-        Log.w("BEETLE", "queue - next - " + queue.size() + " - " + running);
+        Log.w("BEETLE", "queue - next - " + queue.size() + " - " + running());
         if (queue.isEmpty()) {
-            running = false;
+            current = null;
             return;
         }
 
-        emit(queue.removeFirst());
-        running = true;
+        current = queue.removeFirst();
+        emit(current);
+    }
+
+    public synchronized boolean running() {
+        return current != null;
+    }
+
+    public synchronized T current() {
+        return current;
+    }
+
+    public synchronized void retryCurrent() {
+        if (!running()) {
+            return;
+        }
+
+        emit(current);
     }
 
     public abstract void emit(T item);

@@ -29,12 +29,14 @@ public class BeetleService extends Service {
                     case Intent.ACTION_SCREEN_ON:
                     case Intent.ACTION_BOOT_COMPLETED:
                     case Intent.ACTION_BATTERY_OKAY:
+                        Beetle.getBeetleManager().setHighPower(false);
                         Beetle.getBeetleManager().enable();
                         break;
                     case BluetoothAdapter.ACTION_STATE_CHANGED:
                         switch (intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, -1)) {
                             case BluetoothAdapter.STATE_ON:
                             case BluetoothAdapter.STATE_CONNECTED:
+                                Beetle.getBeetleManager().setHighPower(true);
                                 Beetle.getBeetleManager().enable();
                                 break;
                             case BluetoothAdapter.STATE_DISCONNECTED:

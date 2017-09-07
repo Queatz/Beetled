@@ -37,6 +37,8 @@ public class BeetleManager {
 
     private final LinkedList<BeetleGatt> gatts = new LinkedList<>();
 
+    private int scanMode;
+    private boolean isScanning;
     private boolean locked = false;
     private boolean setup = false;
     private Handler handler;
@@ -78,7 +80,7 @@ public class BeetleManager {
             }
 
             if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled()) {
-                Toast.makeText(app, "BLE not enabled", Toast.LENGTH_SHORT).show();
+                Toast.makeText(app, "Bluetooth not enabled", Toast.LENGTH_SHORT).show();
                 return false;
             }
 
@@ -123,12 +125,33 @@ public class BeetleManager {
                 gatts.removeFirst().close();
             }
         }
-
     }
 
+    /**
+     * Sets scan power consumption
+     */
+    public void setHighPower(boolean isHighPower) {
+        int newScanMode = isHighPower ?
+                ScanSettings.SCAN_MODE_LOW_LATENCY :
+                ScanSettings.SCAN_MODE_BALANCED;
+
+        if (scanMode == newScanMode) {
+            return;
+        }
+
+        if (isScanning) {
+            stopScan();
+            scanMode = newScanMode;
+            startScan();
+        }
+    }
+
+
     private boolean startScan() {
+        isScanning = true;
+
         ScanSettings scanSettings = new ScanSettings.Builder()
-                .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+                .setScanMode(scanMode)
                 .setReportDelay(REPORTING_DELAY)
                 .build();
 
@@ -139,7 +162,9 @@ public class BeetleManager {
 
         bluetoothLeScanner.startScan(null, scanSettings, scanCallback);
 
-        background.postDelayed(flush, 1000);
+        if (scanMode == ScanSettings.SCAN_MODE_LOW_LATENCY) {
+            background.postDelayed(flush, REPORTING_DELAY * 2);
+        }
 
         return true;
     }
@@ -154,6 +179,8 @@ public class BeetleManager {
         }
 
         oldScanDisable();
+
+        isScanning = false;
     }
 
     /**
@@ -182,14 +209,14 @@ public class BeetleManager {
      * Called when a potential beetle is found
      */
     private void foundDevice(final BluetoothDevice device) {
-        if (isLocked()) {
+        if (isLocked() || !isScanning) {
             return;
         }
 
         handler.post(new Runnable() {
             @Override
             public void run() {
-                if (isLocked()) {
+                if (isLocked() || !isScanning) {
                     return;
                 }
 
